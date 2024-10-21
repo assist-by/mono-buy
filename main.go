@@ -9,11 +9,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"time"
 
+	calculate "github.com/assist-by/abmodule/calculate"
+	notification "github.com/assist-by/abmodule/notification"
 	lib "github.com/assist-by/libStruct"
-	"github.com/gin-gonic/gin"
+	signalType "github.com/assist-by/libStruct/enums/signalType"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -21,31 +25,28 @@ const (
 	maxRetries      = 5
 	retryDelay      = 5 * time.Second
 	candleLimit     = 300
-	fetchInterval   = 15 * time.Minute
+	fetchInterval   = 1 * time.Minute
 )
 
 var (
-	host             string
-	port             string
-	isRunning        bool
-	runningMutex     sync.Mutex
-	serviceCtx       context.Context
-	serviceCtxCancel context.CancelFunc
+	isRunning         bool
+	discordWebhookURL string
+	runningMutex      sync.Mutex
+	serviceCtx        context.Context
+	serviceCtxCancel  context.CancelFunc
 )
 
 func init() {
-	host = os.Getenv("HOST")
-	if host == "" {
-		host = "abprice"
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
 	}
-	port = os.Getenv("PORT")
-	if port == "" {
-		port = "50051"
-	}
+
+	discordWebhookURL = os.Getenv("DISCORD_WEBHOOK_URL")
+
 	serviceCtx, serviceCtxCancel = context.WithCancel(context.Background())
 }
 
-// 캔들 데이터 패치
 func fetchBTCCandleData(url string) ([]lib.CandleData, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -80,28 +81,97 @@ func fetchBTCCandleData(url string) ([]lib.CandleData, error) {
 	return candles, nil
 }
 
-func printCandles(candles []lib.CandleData) {
-	for _, candle := range candles {
-		fmt.Printf("OpenTime: %d, Open: %s, High: %s, Low: %s, Close: %s, Volume: %s, CloseTime: %d\n",
-			candle.OpenTime, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume, candle.CloseTime)
+func calculateIndicators(candles []lib.CandleData) (lib.TechnicalIndicators, error) {
+	if len(candles) < 300 {
+		return lib.TechnicalIndicators{}, fmt.Errorf("insufficient data: need at least 300 candles, got %d", len(candles))
 	}
+
+	prices := make([]float64, len(candles))
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+
+	for i, candle := range candles {
+		price, err := strconv.ParseFloat(candle.Close, 64)
+		if err != nil {
+			return lib.TechnicalIndicators{}, fmt.Errorf("error parsing close price: %v", err)
+		}
+		prices[i] = price
+
+		high, err := strconv.ParseFloat(candle.High, 64)
+		if err != nil {
+			return lib.TechnicalIndicators{}, fmt.Errorf("error parsing high price: %v", err)
+		}
+		highs[i] = high
+
+		low, err := strconv.ParseFloat(candle.Low, 64)
+		if err != nil {
+			return lib.TechnicalIndicators{}, fmt.Errorf("error parsing low price: %v", err)
+		}
+		lows[i] = low
+	}
+
+	ema200 := calculate.CalculateEMA(prices, 200)
+	macdLine, signalLine := calculate.CalculateMACD(prices)
+	parabolicSAR := calculate.CalculateParabolicSAR(highs, lows)
+
+	return lib.TechnicalIndicators{
+		EMA200:       ema200,
+		ParabolicSAR: parabolicSAR,
+		MACDLine:     macdLine,
+		SignalLine:   signalLine,
+	}, nil
 }
 
-func utcToLocal(utcTime time.Time) time.Time {
-	loc, err := time.LoadLocation("Asia/Seoul")
-	if err != nil {
-		log.Printf("Error loading location: %v\n", err)
-		return utcTime
+func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators) (string, lib.SignalConditions, float64, float64) {
+	lastPrice, _ := strconv.ParseFloat(candles[len(candles)-1].Close, 64)
+	lastHigh, _ := strconv.ParseFloat(candles[len(candles)-1].High, 64)
+	lastLow, _ := strconv.ParseFloat(candles[len(candles)-1].Low, 64)
+
+	conditions := lib.SignalConditions{
+		Long: lib.SignalDetail{
+			EMA200Condition:       lastPrice > indicators.EMA200,
+			ParabolicSARCondition: indicators.ParabolicSAR < lastLow,
+			MACDCondition:         indicators.MACDLine > indicators.SignalLine,
+			EMA200Value:           indicators.EMA200,
+			EMA200Diff:            lastPrice - indicators.EMA200,
+			ParabolicSARValue:     indicators.ParabolicSAR,
+			ParabolicSARDiff:      lastLow - indicators.ParabolicSAR,
+			MACDHistogram:         indicators.MACDLine - indicators.SignalLine,
+			MACDMACDLine:          indicators.MACDLine,
+			MACDSignalLine:        indicators.SignalLine,
+		},
+		Short: lib.SignalDetail{
+			EMA200Condition:       lastPrice < indicators.EMA200,
+			ParabolicSARCondition: indicators.ParabolicSAR > lastHigh,
+			MACDCondition:         indicators.MACDLine < indicators.SignalLine,
+			EMA200Value:           indicators.EMA200,
+			EMA200Diff:            lastPrice - indicators.EMA200,
+			ParabolicSARValue:     indicators.ParabolicSAR,
+			ParabolicSARDiff:      indicators.ParabolicSAR - lastHigh,
+			MACDHistogram:         indicators.MACDLine - indicators.SignalLine,
+			MACDMACDLine:          indicators.MACDLine,
+			MACDSignalLine:        indicators.SignalLine,
+		},
 	}
-	return utcTime.In(loc)
+
+	var stopLoss, takeProfit float64
+
+	if conditions.Long.EMA200Condition && conditions.Long.ParabolicSARCondition && conditions.Long.MACDCondition {
+		stopLoss = indicators.ParabolicSAR
+		takeProfit = lastPrice + (lastPrice - stopLoss)
+		return signalType.Long.String(), conditions, stopLoss, takeProfit
+	} else if conditions.Short.EMA200Condition && conditions.Short.ParabolicSARCondition && conditions.Short.MACDCondition {
+		stopLoss = indicators.ParabolicSAR
+		takeProfit = lastPrice - (stopLoss - lastPrice)
+		return signalType.Short.String(), conditions, stopLoss, takeProfit
+	}
+	return signalType.No_Signal.String(), conditions, 0.0, 0.0
 }
 
-// 다음 fetch 시간 구하는 함수
 func nextIntervalStart(now time.Time, interval time.Duration) time.Time {
 	return now.Truncate(interval).Add(interval)
 }
 
-// 시간 반복에 따른 url에 넣을 String 반환 함수
 func getIntervalString(interval time.Duration) string {
 	switch interval {
 	case 1 * time.Minute:
@@ -115,7 +185,68 @@ func getIntervalString(interval time.Duration) string {
 	}
 }
 
-// 서비스 시작 함수
+func processSignal(signalResult lib.SignalResult) error {
+	log.Printf("Processing signal: %+v", signalResult)
+
+	discordColor := notification.GetColorForDiscord(signalResult.Signal)
+
+	title := fmt.Sprintf("New Signal: %s", signalResult.Signal)
+	description := generateDescription(signalResult)
+
+	discordEmbed := notification.Embed{
+		Title:       title,
+		Description: description,
+		Color:       discordColor,
+	}
+	if err := notification.SendDiscordAlert(discordEmbed, discordWebhookURL); err != nil {
+		log.Printf("Error sending Discord alert: %v", err)
+		return err
+	}
+
+	log.Println("Notifications sent successfully")
+	return nil
+}
+
+func generateDescription(signalResult lib.SignalResult) string {
+	koreaLocation, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		log.Printf("Error loading Asia/Seoul timezone: %v", err)
+		koreaLocation = time.UTC
+	}
+	timestamp := time.Unix(signalResult.Timestamp/1000, 0).In(koreaLocation).Format("2006-01-02 15:04:05 MST")
+
+	description := fmt.Sprintf("Signal: %s for BTCUSDT at %s\n\n", signalResult.Signal, timestamp)
+	description += fmt.Sprintf("Price : %.3f\n", signalResult.Price)
+
+	if signalResult.Signal != signalType.No_Signal.String() {
+		description += fmt.Sprintf("Stoploss : %.3f, Takeprofit: %.3f\n\n", signalResult.StopLoss, signalResult.TakeProfie)
+	}
+
+	description += "=======[LONG]=======\n"
+	description += fmt.Sprintf("[EMA200] : %v \n", signalResult.Conditions.Long.EMA200Condition)
+	description += fmt.Sprintf("EMA200: %.3f, Diff: %.3f\n\n", signalResult.Conditions.Long.EMA200Value, signalResult.Conditions.Long.EMA200Diff)
+
+	description += fmt.Sprintf("[MACD] : %v \n", signalResult.Conditions.Long.MACDCondition)
+	description += fmt.Sprintf("Now MACD Line: %.3f, Now Signal Line: %.3f, Now Histogram: %.3f\n", signalResult.Conditions.Long.MACDMACDLine, signalResult.Conditions.Long.MACDSignalLine, signalResult.Conditions.Long.MACDHistogram)
+
+	description += fmt.Sprintf("[Parabolic SAR] : %v \n", signalResult.Conditions.Long.ParabolicSARCondition)
+	description += fmt.Sprintf("ParabolicSAR: %.3f, Diff: %.3f\n", signalResult.Conditions.Long.ParabolicSARValue, signalResult.Conditions.Long.ParabolicSARDiff)
+	description += "=====================\n\n"
+
+	description += "=======[SHORT]=======\n"
+	description += fmt.Sprintf("[EMA200] : %v \n", signalResult.Conditions.Short.EMA200Condition)
+	description += fmt.Sprintf("EMA200: %.3f, Diff: %.3f\n\n", signalResult.Conditions.Short.EMA200Value, signalResult.Conditions.Short.EMA200Diff)
+
+	description += fmt.Sprintf("[MACD] : %v \n", signalResult.Conditions.Short.MACDCondition)
+	description += fmt.Sprintf("MACD Line: %.3f, Signal Line: %.3f, Histogram: %.3f\n\n", signalResult.Conditions.Short.MACDMACDLine, signalResult.Conditions.Short.MACDSignalLine, signalResult.Conditions.Short.MACDHistogram)
+
+	description += fmt.Sprintf("[Parabolic SAR] : %v \n", signalResult.Conditions.Short.ParabolicSARCondition)
+	description += fmt.Sprintf("ParabolicSAR: %.3f, Diff: %.3f\n", signalResult.Conditions.Short.ParabolicSARValue, signalResult.Conditions.Short.ParabolicSARDiff)
+	description += "=====================\n"
+
+	return description
+}
+
 func startService(ctx context.Context) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
@@ -129,7 +260,7 @@ func startService(ctx context.Context) {
 
 		select {
 		case <-time.After(sleepDuration):
-			url := fmt.Sprintf("%s?symbol=BTCUSDT&interval=%s&limit=%d", binanceKlineAPI, getIntervalString(sleepDuration), candleLimit)
+			url := fmt.Sprintf("%s?symbol=BTCUSDT&interval=%s&limit=%d", binanceKlineAPI, getIntervalString(fetchInterval), candleLimit)
 
 			candles, err := fetchBTCCandleData(url)
 			if err != nil {
@@ -137,16 +268,35 @@ func startService(ctx context.Context) {
 				continue
 			}
 
-			printCandles(candles)
-			log.Printf("Successfully printed %d candle data\n", len(candles))
-			if len(candles) > 0 {
-				firstCandle := candles[0]
+			if len(candles) == candleLimit {
+				indicators, err := calculateIndicators(candles)
+				if err != nil {
+					log.Printf("Error calculating indicators: %v\n", err)
+					continue
+				}
+
+				signalType, conditions, stopLoss, takeProfit := generateSignal(candles, indicators)
 				lastCandle := candles[len(candles)-1]
-				firstTime := utcToLocal(time.Unix(firstCandle.OpenTime/1000, 0))
-				lastTime := utcToLocal(time.Unix(lastCandle.CloseTime/1000, 0))
-				log.Printf("Data range (Local Time): %v to %v\n",
-					firstTime.Format("2006-01-02 15:04:05"),
-					lastTime.Format("2006-01-02 15:04:05"))
+				price, err := strconv.ParseFloat(lastCandle.Close, 64)
+				if err != nil {
+					log.Printf("Error convert price to float: %v\n", err)
+					continue
+				}
+
+				signalResult := lib.SignalResult{
+					Signal:     signalType,
+					Timestamp:  lastCandle.CloseTime,
+					Price:      price,
+					Conditions: conditions,
+					StopLoss:   stopLoss,
+					TakeProfie: takeProfit,
+				}
+
+				if err := processSignal(signalResult); err != nil {
+					log.Printf("Error processing signal: %v", err)
+				}
+			} else {
+				log.Printf("Insufficient data: got %d candles, expected %d\n", len(candles), candleLimit)
 			}
 
 		case <-signals:
@@ -160,79 +310,15 @@ func startService(ctx context.Context) {
 	}
 }
 
-// POST
-// start service를 /start API로 받아서 실행하는 함수
-func startHandler(c *gin.Context) {
-	runningMutex.Lock()
-	defer runningMutex.Unlock()
-
-	if isRunning {
-		c.JSON(http.StatusOK, gin.H{"message": "abprice is already running"})
-		return
-	}
-
-	isRunning = true
-	go startService(serviceCtx)
-	c.JSON(http.StatusOK, gin.H{"message": "abprice started successfully"})
-}
-
-// POST
-// stop service를 /stop API로 받아서 실행하는 함수
-func stopHandler(c *gin.Context) {
-	runningMutex.Lock()
-	defer runningMutex.Unlock()
-
-	if !isRunning {
-		c.JSON(http.StatusOK, gin.H{"message": "abprice is not running"})
-		return
-	}
-
-	serviceCtxCancel() // 서비스 컨텍스트 취소
-	isRunning = false
-	c.JSON(http.StatusOK, gin.H{"message": "abprice stopped successfully"})
-}
-
-// GET
-// status를 /status API로 받아서 실행하는 함수
-func statusHandler(c *gin.Context) {
-	runningMutex.Lock()
-	defer runningMutex.Unlock()
-
-	status := "stopped"
-	if isRunning {
-		status = "running"
-	}
-	c.JSON(http.StatusOK, gin.H{"status": status})
-}
-
 func main() {
-	router := gin.Default()
-	router.POST("/start", startHandler)
-	router.POST("/stop", stopHandler)
-	router.GET("/status", statusHandler)
 
-	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
-	}
+	log.Println("Starting BTC Signal Generator with Notifications...")
 
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server : %v", err)
-		}
-	}()
+	runningMutex.Lock()
+	isRunning = true
+	runningMutex.Unlock()
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
-	<-signals
-	log.Println("Shutting down server...")
+	startService(serviceCtx)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("Server forced to shutdown:", err)
-	}
-
-	log.Println("Server exiting")
+	log.Println("BTC Signal Generator with Notifications stopped")
 }
