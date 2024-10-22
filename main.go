@@ -23,6 +23,8 @@ const (
 )
 
 var (
+	apikey            string
+	secretkey         string
 	isRunning         bool
 	discordWebhookURL string
 	runningMutex      sync.Mutex
@@ -37,6 +39,8 @@ func init() {
 	}
 
 	discordWebhookURL = os.Getenv("DISCORD_WEBHOOK_URL")
+	apikey = os.Getenv("API_KEY")
+	secretkey = os.Getenv("SECRET_KEY")
 
 	serviceCtx, serviceCtxCancel = context.WithCancel(context.Background())
 }
@@ -54,6 +58,17 @@ func startService(ctx context.Context) {
 
 		select {
 		case <-time.After(sleepDuration):
+			// 지갑 잔액 조회
+			btcBalance, err := fetchWalletBalance(apikey, secretkey)
+			if err != nil {
+				log.Printf("❌ Error fetching wallet balance: %v\n", err)
+			} else {
+				log.Printf("=== 현재 지갑 상태 ===")
+				log.Printf("🏦 BTC 보유량: %.8f BTC\n", btcBalance)
+			}
+			log.Printf("-------------------------------------------")
+
+			// 가격 데이터 조회
 			url := fmt.Sprintf("%s?symbol=BTCUSDT&interval=%s&limit=%d", binanceKlineAPI, getIntervalString(fetchInterval), candleLimit)
 
 			candles, err := fetchBTCCandleData(url)
@@ -63,17 +78,30 @@ func startService(ctx context.Context) {
 			}
 
 			if len(candles) == candleLimit {
+				// 현재 BTC 가격 계산
+				currentPrice, _ := strconv.ParseFloat(candles[len(candles)-1].Close, 64)
+				log.Printf("💰 현재 BTC 가격: $%.2f\n", currentPrice)
+
+				// 지갑 가치 계산 (USD)
+				if btcBalance > 0 {
+					walletValueUSD := btcBalance * currentPrice
+					log.Printf("💎 지갑 가치: $%.2f\n", walletValueUSD)
+				}
+				log.Printf("-------------------------------------------")
+
+				// 보조지표 계산
 				indicators, err := calculateIndicators(candles)
 				if err != nil {
-					log.Printf("Error calculating indicators: %v\n", err)
+					log.Printf("❌ Error calculating indicators: %v\n", err)
 					continue
 				}
 
+				// 매수매도 신호 계산
 				signalType, conditions, stopLoss, takeProfit := generateSignal(candles, indicators)
 				lastCandle := candles[len(candles)-1]
 				price, err := strconv.ParseFloat(lastCandle.Close, 64)
 				if err != nil {
-					log.Printf("Error convert price to float: %v\n", err)
+					log.Printf("❌ Error convert price to float: %v\n", err)
 					continue
 				}
 
