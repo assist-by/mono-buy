@@ -5,66 +5,88 @@ import (
 	"log"
 	"time"
 
-	notification "github.com/assist-by/abmodule/notification"
+	"github.com/assist-by/abmodule/notification"
 	lib "github.com/assist-by/libStruct"
 	signalType "github.com/assist-by/libStruct/enums/signalType"
 )
 
-// 로그 description 생성 함수
-func generateDescription(signalResult lib.SignalResult) string {
-	koreaLocation, err := time.LoadLocation("Asia/Seoul")
-	if err != nil {
-		log.Printf("Error loading Asia/Seoul timezone: %v", err)
-		koreaLocation = time.UTC
-	}
-	timestamp := time.Unix(signalResult.Timestamp/1000, 0).In(koreaLocation).Format("2006-01-02 15:04:05 MST")
+// processSignal과 generateDiscordEmbed 함수
+func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
+	koreaLocation, _ := time.LoadLocation("Asia/Seoul")
+	timestamp := time.Unix(signalResult.Timestamp/1000, 0).In(koreaLocation)
 
-	description := fmt.Sprintf("Signal: %s for BTCUSDT at %s\n\n", signalResult.Signal, timestamp)
-	description += fmt.Sprintf("Price : %.3f\n", signalResult.Price)
+	var signalEmoji string
+	switch signalResult.Signal {
+	case signalType.Long.String():
+		signalEmoji = "🚀 LONG"
+	case signalType.Short.String():
+		signalEmoji = "🔻 SHORT"
+	default:
+		signalEmoji = "⏺️ NO SIGNAL"
+	}
+
+	mainDescription := fmt.Sprintf("**시간**: %s\n**현재가**: $%.2f\n",
+		timestamp.Format("2006-01-02 15:04:05 KST"),
+		signalResult.Price)
 
 	if signalResult.Signal != signalType.No_Signal.String() {
-		description += fmt.Sprintf("Stoploss : %.3f, Takeprofit: %.3f\n\n", signalResult.StopLoss, signalResult.TakeProfie)
+		mainDescription += fmt.Sprintf("**스탑로스**: $%.2f\n**목표가**: $%.2f\n",
+			signalResult.StopLoss,
+			signalResult.TakeProfie)
 	}
 
-	description += "=======[LONG]=======\n"
-	description += fmt.Sprintf("[EMA200] : %v \n", signalResult.Conditions.Long.EMA200Condition)
-	description += fmt.Sprintf("EMA200: %.3f, Diff: %.3f\n\n", signalResult.Conditions.Long.EMA200Value, signalResult.Conditions.Long.EMA200Diff)
-
-	description += fmt.Sprintf("[MACD] : %v \n", signalResult.Conditions.Long.MACDCondition)
-	description += fmt.Sprintf("Now MACD Line: %.3f, Now Signal Line: %.3f, Now Histogram: %.3f\n", signalResult.Conditions.Long.MACDMACDLine, signalResult.Conditions.Long.MACDSignalLine, signalResult.Conditions.Long.MACDHistogram)
-
-	description += fmt.Sprintf("[Parabolic SAR] : %v \n", signalResult.Conditions.Long.ParabolicSARCondition)
-	description += fmt.Sprintf("ParabolicSAR: %.3f, Diff: %.3f\n", signalResult.Conditions.Long.ParabolicSARValue, signalResult.Conditions.Long.ParabolicSARDiff)
-	description += "=====================\n\n"
-
-	description += "=======[SHORT]=======\n"
-	description += fmt.Sprintf("[EMA200] : %v \n", signalResult.Conditions.Short.EMA200Condition)
-	description += fmt.Sprintf("EMA200: %.3f, Diff: %.3f\n\n", signalResult.Conditions.Short.EMA200Value, signalResult.Conditions.Short.EMA200Diff)
-
-	description += fmt.Sprintf("[MACD] : %v \n", signalResult.Conditions.Short.MACDCondition)
-	description += fmt.Sprintf("MACD Line: %.3f, Signal Line: %.3f, Histogram: %.3f\n\n", signalResult.Conditions.Short.MACDMACDLine, signalResult.Conditions.Short.MACDSignalLine, signalResult.Conditions.Short.MACDHistogram)
-
-	description += fmt.Sprintf("[Parabolic SAR] : %v \n", signalResult.Conditions.Short.ParabolicSARCondition)
-	description += fmt.Sprintf("ParabolicSAR: %.3f, Diff: %.3f\n", signalResult.Conditions.Short.ParabolicSARValue, signalResult.Conditions.Short.ParabolicSARDiff)
-	description += "=====================\n"
-
-	return description
+	return notification.Embed{
+		Title:       fmt.Sprintf("%s BTC/USDT", signalEmoji),
+		Description: mainDescription,
+		Fields: []notification.EmbedField{
+			{
+				Name: "📈 LONG",
+				Value: fmt.Sprintf("```diff\n%s\n%s\n%s```\n```\n[EMA200]: %.2f (차이: %.2f)\n[MACD Line]: %.2f\n[Signal Line]: %.2f\n[Histogram]: %.2f\n[SAR]: %.2f (차이: %.2f)```",
+					formatConditionWithSymbol(signalResult.Conditions.Long.EMA200Condition, "EMA200"),
+					formatConditionWithSymbol(signalResult.Conditions.Long.MACDCondition, "MACD"),
+					formatConditionWithSymbol(signalResult.Conditions.Long.ParabolicSARCondition, "SAR"),
+					signalResult.Conditions.Long.EMA200Value,
+					signalResult.Conditions.Long.EMA200Diff,
+					signalResult.Conditions.Long.MACDMACDLine,
+					signalResult.Conditions.Long.MACDSignalLine,
+					signalResult.Conditions.Long.MACDHistogram,
+					signalResult.Conditions.Long.ParabolicSARValue,
+					signalResult.Conditions.Long.ParabolicSARDiff),
+				Inline: true,
+			},
+			{
+				Name: "📉 SHORT",
+				Value: fmt.Sprintf("```diff\n%s\n%s\n%s```\n```[EMA200]: %.2f (차이: %.2f)\n[MACD Line]: %.2f\n[Signal Line]: %.2f\n[Histogram]: %.2f\n[SAR]: %.2f (차이: %.2f)```",
+					formatConditionWithSymbol(signalResult.Conditions.Short.EMA200Condition, "EMA200"),
+					formatConditionWithSymbol(signalResult.Conditions.Short.MACDCondition, "MACD"),
+					formatConditionWithSymbol(signalResult.Conditions.Short.ParabolicSARCondition, "SAR"),
+					signalResult.Conditions.Short.EMA200Value,
+					signalResult.Conditions.Short.EMA200Diff,
+					signalResult.Conditions.Short.MACDMACDLine,
+					signalResult.Conditions.Short.MACDSignalLine,
+					signalResult.Conditions.Short.MACDHistogram,
+					signalResult.Conditions.Short.ParabolicSARValue,
+					signalResult.Conditions.Short.ParabolicSARDiff),
+				Inline: true,
+			},
+		},
+		Color:     notification.GetColorForDiscord(signalResult.Signal),
+		Footer:    &notification.EmbedFooter{Text: "🤖 Assist Trading Bot"},
+		Timestamp: timestamp.Format(time.RFC3339),
+	}
 }
 
-// notification 보내는 함수
+func formatConditionWithSymbol(condition bool, text string) string {
+	if condition {
+		return fmt.Sprintf("+ %s", text)
+	}
+	return fmt.Sprintf("- %s", text)
+}
+
 func processSignal(signalResult lib.SignalResult) error {
 	log.Printf("Processing signal: %+v", signalResult)
 
-	discordColor := notification.GetColorForDiscord(signalResult.Signal)
-
-	title := fmt.Sprintf("New Signal: %s", signalResult.Signal)
-	description := generateDescription(signalResult)
-
-	discordEmbed := notification.Embed{
-		Title:       title,
-		Description: description,
-		Color:       discordColor,
-	}
+	discordEmbed := generateDiscordEmbed(signalResult)
 	if err := notification.SendDiscordAlert(discordEmbed, discordWebhookURL); err != nil {
 		log.Printf("Error sending Discord alert: %v", err)
 		return err
