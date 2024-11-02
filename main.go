@@ -63,7 +63,7 @@ func startService(ctx context.Context) {
 				log.Printf("❌ Error fetching wallet balances: %v\n", err)
 			} else {
 				log.Printf("=== 현재 지갑 상태 ===")
-				if let(balances) == 0 {
+				if len(balances) == 0 {
 					log.Printf("⚠️ 잔액이 있는 자산이 없습니다.")
 				} else {
 					for asset, balance := range balances {
