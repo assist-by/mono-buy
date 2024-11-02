@@ -58,13 +58,19 @@ func startService(ctx context.Context) {
 
 		select {
 		case <-time.After(sleepDuration):
-			// 지갑 잔액 조회
-			btcBalance, err := fetchWalletBalance(apikey, secretkey)
+			balances, err := fetchWalletBalance(apikey, secretkey)
 			if err != nil {
-				log.Printf("❌ Error fetching wallet balance: %v\n", err)
+				log.Printf("❌ Error fetching wallet balances: %v\n", err)
 			} else {
 				log.Printf("=== 현재 지갑 상태 ===")
-				log.Printf("🏦 BTC 보유량: %.8f BTC\n", btcBalance)
+				if let(balances) == 0 {
+					log.Printf("⚠️ 잔액이 있는 자산이 없습니다.")
+				} else {
+					for asset, balance := range balances {
+						log.Printf("🏦 %s 보유량: %.8f (가용: %.8f, 잠금: %.8f)\n",
+							asset, balance.Total, balance.Free, balance.Locked)
+					}
+				}
 			}
 			log.Printf("-------------------------------------------")
 
@@ -81,13 +87,6 @@ func startService(ctx context.Context) {
 				// 현재 BTC 가격 계산
 				currentPrice, _ := strconv.ParseFloat(candles[len(candles)-1].Close, 64)
 				log.Printf("💰 현재 BTC 가격: $%.2f\n", currentPrice)
-
-				// 지갑 가치 계산 (USD)
-				if btcBalance > 0 {
-					walletValueUSD := btcBalance * currentPrice
-					log.Printf("💎 지갑 가치: $%.2f\n", walletValueUSD)
-				}
-				log.Printf("-------------------------------------------")
 
 				// 보조지표 계산
 				indicators, err := calculateIndicators(candles)

@@ -12,11 +12,18 @@ import (
 	"time"
 )
 
-func fetchWalletBalance(apiKey, secretKey string) (float64, error) {
+type WalletBalance struct {
+	Asset  string  `json:"asset"`
+	Free   float64 `json:"free"`
+	Locked float64 `json:"locked"`
+	Total  float64 `json:"total"`
+}
+
+func fetchWalletBalance(apiKey, secretKey string) (map[string]WalletBalance, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.binance.com/api/v3/account", nil)
 	if err != nil {
-		return 0, err
+		return nil, fmt.Errorf("creating request failed: %w", err)
 	}
 
 	timestamp := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
@@ -30,13 +37,13 @@ func fetchWalletBalance(apiKey, secretKey string) (float64, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, err
+		return nil, fmt.Errorf("API request fialed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, err
+		return nil, fmt.Errorf("reading response faield: %w", err)
 	}
 
 	var account struct {
@@ -47,22 +54,44 @@ func fetchWalletBalance(apiKey, secretKey string) (float64, error) {
 		} `json:"balances"`
 	}
 
-	err = json.Unmarshal(body, &account)
-	if err != nil {
-		return 0, err
+	if err = json.Unmarshal(body, &account); err != nil {
+		return nil, fmt.Errorf("parsing response failed: %w", err)
 	}
 
+	balances := make(map[string]WalletBalance)
+
 	for _, balance := range account.Balances {
-		if balance.Asset == "BTC" {
-			btcBalance, err := strconv.ParseFloat(balance.Free, 64)
-			if err != nil {
-				return 0, err
+		free, err := strconv.ParseFloat(balance.Free, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing free balance fialed for %s: %w", balance.Asset, err)
+		}
+
+		locked, err := strconv.ParseFloat(balance.Locked, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing locked balance failed for %s: %w", balance.Asset, err)
+		}
+
+		total := free + locked
+
+		if total > 0 {
+			balances[balance.Asset] = WalletBalance{
+				Asset:  balance.Asset,
+				Free:   free,
+				Locked: locked,
+				Total:  total,
 			}
-			return btcBalance, nil
 		}
 	}
 
-	return 0, fmt.Errorf("BTC balance not found")
+	return balances, nil
+}
+
+func getAssetsBalance(balances map[string]WalletBalance, asset string) (WalletBalance, error) {
+	if balance, exists := balances[asset]; exists {
+		return balance, nil
+	}
+	return WalletBalance{}, fmt.Errorf("asset %s not found in wallet", asset)
+
 }
 
 func hmacSha256(message, secret []byte) string {
