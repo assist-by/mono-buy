@@ -78,9 +78,9 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 
 func formatConditionWithSymbol(condition bool, text string) string {
 	if condition {
-		return fmt.Sprintf("+ %s", text)
+		return fmt.Sprintf("✅ %s", text)
 	}
-	return fmt.Sprintf("- %s", text)
+	return fmt.Sprintf("❌ %s", text)
 }
 
 func processSignal(signalResult lib.SignalResult) error {
