@@ -19,7 +19,7 @@ const (
 	maxRetries      = 5
 	retryDelay      = 5 * time.Second
 	candleLimit     = 300
-	fetchInterval   = 1 * time.Minute
+	// fetchInterval   = 1 * time.Minute
 )
 
 var (
@@ -27,6 +27,7 @@ var (
 	secretkey         string
 	isRunning         bool
 	discordWebhookURL string
+	fetchInterval     time.Duration
 	runningMutex      sync.Mutex
 	serviceCtx        context.Context
 	serviceCtxCancel  context.CancelFunc
@@ -41,7 +42,10 @@ func init() {
 	discordWebhookURL = os.Getenv("DISCORD_WEBHOOK_URL")
 	apikey = os.Getenv("API_KEY")
 	secretkey = os.Getenv("SECRET_KEY")
-
+	fetchInterval, err = time.ParseDuration(os.Getenv("FETCH_INTERVAL"))
+	if err != nil {
+		log.Fatalf("Invalid fetch interval: %v", err)
+	}
 	serviceCtx, serviceCtxCancel = context.WithCancel(context.Background())
 }
 
