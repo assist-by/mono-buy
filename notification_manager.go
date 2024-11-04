@@ -30,9 +30,22 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 		signalResult.Price)
 
 	if signalResult.Signal != signalType.No_Signal.String() {
-		mainDescription += fmt.Sprintf("**스탑로스**: $%.2f\n**목표가**: $%.2f\n",
+		// 수익률 계산
+		stopLossPercent := (signalResult.StopLoss - signalResult.Price) / signalResult.Price * 100
+		takeProfitPercent := (signalResult.TakeProfie - signalResult.Price) / signalResult.Price * 100
+
+		// Short 포지션일 경우 수익률 부호를 반대로
+		if signalResult.Signal == signalType.Short.String() {
+			stopLossPercent = -stopLossPercent
+			takeProfitPercent = -takeProfitPercent
+		}
+
+		mainDescription += fmt.Sprintf("**스탑로스**: $%.2f (%.2f%%)\n**목표가**: $%.2f (%.2f%%)\n",
 			signalResult.StopLoss,
-			signalResult.TakeProfie)
+			stopLossPercent,
+			signalResult.TakeProfie,
+			takeProfitPercent)
+
 	}
 
 	return notification.Embed{
