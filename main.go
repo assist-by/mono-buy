@@ -49,9 +49,17 @@ func init() {
 	serviceCtx, serviceCtxCancel = context.WithCancel(context.Background())
 }
 
+func NewCoinTracker(symbol string) *lib.CoinTracker {
+	return &lib.CoinTracker{
+		Symbol: symbol,
+	}
+}
+
 func startService(ctx context.Context) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
+
+	// trackers := make(map[string]*lib.CoinTracker)
 
 	for {
 		now := time.Now()
@@ -62,6 +70,15 @@ func startService(ctx context.Context) {
 
 		select {
 		case <-time.After(sleepDuration):
+			// 거래량 상위 심볼 조회
+			topSymbols, err := getTopVolumeSymbols(3)
+			if err != nil {
+				log.Printf("❌ Error fetching top volume symbols: %v\n", err)
+				continue
+			}
+
+			log.Printf("🔍 현재 추적 중인 상위 코인: %v\n", topSymbols)
+
 			balances, err := fetchWalletBalance(apikey, secretkey)
 			if err != nil {
 				log.Printf("❌ Error fetching wallet balances: %v\n", err)
@@ -77,6 +94,9 @@ func startService(ctx context.Context) {
 				}
 			}
 			log.Printf("-------------------------------------------")
+
+			// 심볼별 데이터 수집 및 신호 생성
+			// TODO: 구현해야함
 
 			// 가격 데이터 조회
 			url := fmt.Sprintf("%s?symbol=BTCUSDT&interval=%s&limit=%d", binanceKlineAPI, getIntervalString(fetchInterval), candleLimit)
