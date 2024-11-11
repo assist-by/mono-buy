@@ -86,13 +86,13 @@ func fetchWalletBalance(apiKey, secretKey string) (map[string]WalletBalance, err
 	return balances, nil
 }
 
-func getAssetsBalance(balances map[string]WalletBalance, asset string) (WalletBalance, error) {
-	if balance, exists := balances[asset]; exists {
-		return balance, nil
-	}
-	return WalletBalance{}, fmt.Errorf("asset %s not found in wallet", asset)
+// func getAssetsBalance(balances map[string]WalletBalance, asset string) (WalletBalance, error) {
+// 	if balance, exists := balances[asset]; exists {
+// 		return balance, nil
+// 	}
+// 	return WalletBalance{}, fmt.Errorf("asset %s not found in wallet", asset)
 
-}
+// }
 
 func hmacSha256(message, secret []byte) string {
 	h := hmac.New(sha256.New, secret)
