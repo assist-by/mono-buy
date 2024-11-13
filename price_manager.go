@@ -35,7 +35,7 @@ func getIntervalString(interval time.Duration) string {
 	return "15m" // 기본값
 }
 
-func fetchBTCCandleData(url string) ([]lib.CandleData, error) {
+func fetchCandleData(url string) ([]lib.CandleData, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err

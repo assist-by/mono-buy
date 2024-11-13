@@ -49,7 +49,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 	}
 
 	return notification.Embed{
-		Title:       fmt.Sprintf("%s BTC/USDT", signalEmoji),
+		Title:       fmt.Sprintf("%s %s/USDT", signalEmoji, signalResult.Symbol),
 		Description: mainDescription,
 		Fields: []notification.EmbedField{
 			{

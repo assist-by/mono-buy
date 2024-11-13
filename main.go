@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	lib "github.com/assist-by/libStruct"
+	"github.com/assist-by/mono-buy/lib"
 	"github.com/joho/godotenv"
 )
 
@@ -59,7 +59,7 @@ func startService(ctx context.Context) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
-	// trackers := make(map[string]*lib.CoinTracker)
+	trackers := make(map[string]*lib.CoinTracker)
 
 	for {
 		now := time.Now()
@@ -95,53 +95,77 @@ func startService(ctx context.Context) {
 			}
 			log.Printf("-------------------------------------------")
 
-			// 심볼별 데이터 수집 및 신호 생성
-			// TODO: 구현해야함
+			// 각 심볼별로 데이터 수집 및 신호 생성
+			for _, symbol := range topSymbols {
+				if _, exists := trackers[symbol]; !exists {
+					trackers[symbol] = NewCoinTracker(symbol)
+				}
 
-			// 가격 데이터 조회
-			url := fmt.Sprintf("%s?symbol=BTCUSDT&interval=%s&limit=%d", binanceKlineAPI, getIntervalString(fetchInterval), candleLimit)
+				url := fmt.Sprintf("%s?symbol=%s&interval=%s&limit=%d",
+					binanceKlineAPI,
+					symbol,
+					getIntervalString(fetchInterval),
+					candleLimit)
 
-			candles, err := fetchBTCCandleData(url)
-			if err != nil {
-				log.Printf("Error fetching candle data: %v\n", err)
-				continue
+				candles, err := fetchCandleData(url)
+				if err != nil {
+					log.Printf("❌ Error fetching candle data for %s: %v\n", symbol, err)
+					continue
+				}
+
+				if len(candles) == candleLimit {
+					indicators, err := calculateIndicators(candles)
+					if err != nil {
+						log.Printf("❌ Error calculating indicators for %s: %v\n", symbol, err)
+						continue
+					}
+
+					signalType, conditions, stopLoss, takeProfit := generateSignal(candles, indicators)
+					lastCandle := candles[len(candles)-1]
+
+					// 새로운 신호이거나 다른 시간의 신호인 경우에만 처리
+					if signalType != trackers[symbol].LastSignal || lastCandle.CloseTime != trackers[symbol].LastSignalTime {
+						price, err := strconv.ParseFloat(lastCandle.Close, 64)
+						if err != nil {
+							log.Printf("❌ Error converting price for %s: %v\n", symbol, err)
+							continue
+						}
+
+						signalResult := lib.SignalResult{
+							Symbol:     symbol,
+							Signal:     signalType,
+							Timestamp:  lastCandle.CloseTime,
+							Price:      price,
+							Conditions: conditions,
+							StopLoss:   stopLoss,
+							TakeProfit: takeProfit,
+						}
+
+						if err := processSignal(signalResult); err != nil {
+							log.Printf("Error processing signal for %s: %v", symbol, err)
+						}
+
+						trackers[symbol].LastSignal = signalType
+						trackers[symbol].LastSignalTime = lastCandle.CloseTime
+					}
+				} else {
+					log.Printf("Insufficient data for %s: got %d candles, expected %d\n",
+						symbol, len(candles), candleLimit)
+				}
 			}
 
-			if len(candles) == candleLimit {
-				// 현재 BTC 가격 계산
-				currentPrice, _ := strconv.ParseFloat(candles[len(candles)-1].Close, 64)
-				log.Printf("💰 현재 BTC 가격: $%.2f\n", currentPrice)
-
-				// 보조지표 계산
-				indicators, err := calculateIndicators(candles)
-				if err != nil {
-					log.Printf("❌ Error calculating indicators: %v\n", err)
-					continue
+			// 더 이상 상위 코인이 아닌 심볼들은 트래커에서 제거
+			for symbol := range trackers {
+				found := false
+				for _, topSymbol := range topSymbols {
+					if symbol == topSymbol {
+						found = true
+						break
+					}
 				}
-
-				// 매수매도 신호 계산
-				signalType, conditions, stopLoss, takeProfit := generateSignal(candles, indicators)
-				lastCandle := candles[len(candles)-1]
-				price, err := strconv.ParseFloat(lastCandle.Close, 64)
-				if err != nil {
-					log.Printf("❌ Error convert price to float: %v\n", err)
-					continue
+				if !found {
+					delete(trackers, symbol)
 				}
-
-				signalResult := lib.SignalResult{
-					Signal:     signalType,
-					Timestamp:  lastCandle.CloseTime,
-					Price:      price,
-					Conditions: conditions,
-					StopLoss:   stopLoss,
-					TakeProfie: takeProfit,
-				}
-
-				if err := processSignal(signalResult); err != nil {
-					log.Printf("Error processing signal: %v", err)
-				}
-			} else {
-				log.Printf("Insufficient data: got %d candles, expected %d\n", len(candles), candleLimit)
 			}
 
 		case <-signals:
