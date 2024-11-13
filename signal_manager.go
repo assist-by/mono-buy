@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/assist-by/abmodule/calculate"
-	lib "github.com/assist-by/libStruct"
-	signalType "github.com/assist-by/libStruct/enums/signalType"
+	"github.com/assist-by/mono-buy/lib"
+	signalType "github.com/assist-by/mono-buy/lib/enums/signalType"
 )
 
 // 매수 신호 생성 함수

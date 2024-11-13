@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/assist-by/abmodule/notification"
-	lib "github.com/assist-by/libStruct"
-	signalType "github.com/assist-by/libStruct/enums/signalType"
+	"github.com/assist-by/mono-buy/lib"
+	signalType "github.com/assist-by/mono-buy/lib/enums/signalType"
 )
 
 // processSignal과 generateDiscordEmbed 함수
@@ -32,7 +32,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 	if signalResult.Signal != signalType.No_Signal.String() {
 		// 수익률 계산
 		stopLossPercent := (signalResult.StopLoss - signalResult.Price) / signalResult.Price * 100
-		takeProfitPercent := (signalResult.TakeProfie - signalResult.Price) / signalResult.Price * 100
+		takeProfitPercent := (signalResult.TakeProfit - signalResult.Price) / signalResult.Price * 100
 
 		// Short 포지션일 경우 수익률 부호를 반대로
 		if signalResult.Signal == signalType.Short.String() {
@@ -43,7 +43,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 		mainDescription += fmt.Sprintf("**스탑로스**: $%.2f (%.2f%%)\n**목표가**: $%.2f (%.2f%%)\n",
 			signalResult.StopLoss,
 			stopLossPercent,
-			signalResult.TakeProfie,
+			signalResult.TakeProfit,
 			takeProfitPercent)
 
 	}

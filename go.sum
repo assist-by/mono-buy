@@ -1,6 +1,6 @@
 github.com/assist-by/abmodule v0.0.5 h1:iu5eP8bsOiXFFoKQgcyCL0mbt32y0GqFtydb4DKFQeg=
 github.com/assist-by/abmodule v0.0.5/go.mod h1:t1+tLJl270Yic9Oo/6gzdTTlHMUFT/ZOpkvyZN/EJrM=
-github.com/assist-by/libStruct v0.9.1 h1:fifS/wVD8SQaLv6kq09yt8Uhj937e4jgGNL/EMCgQ4w=
-github.com/assist-by/libStruct v0.9.1/go.mod h1:m2xSaOACiKibwSn3Hd9sPdJTm0V2Rpoa7/r5y91CbhM=
+github.com/assist-by/libStruct v0.1.18 h1:XlCD/1RflRwTDdVn9LzEZ5/xPKsuMirbisFJvwobipE=
+github.com/assist-by/libStruct v0.1.18/go.mod h1:m2xSaOACiKibwSn3Hd9sPdJTm0V2Rpoa7/r5y91CbhM=
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=

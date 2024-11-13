@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	lib "github.com/assist-by/libStruct"
+	"github.com/assist-by/mono-buy/lib"
 )
 
 const (
