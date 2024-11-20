@@ -54,7 +54,6 @@ func NewCoinTracker(symbol string) *lib.CoinTracker {
 		Symbol: symbol,
 	}
 }
-
 func startService(ctx context.Context) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
@@ -63,14 +62,13 @@ func startService(ctx context.Context) {
 
 	for {
 		now := time.Now()
-		nextFetch := nextIntervalStart(now, fetchInterval)
-		sleepDuration := nextFetch.Sub(now)
+		nextCheck := now.Truncate(fetchInterval).Add(fetchInterval)
+		sleepDuration := nextCheck.Sub(now)
 
-		log.Printf("Waiting for %v until next fetch at %v\n", sleepDuration.Round(time.Second), nextFetch.Format("2006-01-02 15:04:05"))
+		log.Printf("Waiting for %v until next fetch at %v\n", sleepDuration.Round(time.Second), nextCheck.Format("2006-01-02 15:04:05"))
 
 		select {
 		case <-time.After(sleepDuration):
-			// 거래량 상위 심볼 조회
 			topSymbols, err := getTopVolumeSymbols(3)
 			if err != nil {
 				log.Printf("❌ Error fetching top volume symbols: %v\n", err)
@@ -95,7 +93,6 @@ func startService(ctx context.Context) {
 			}
 			log.Printf("-------------------------------------------")
 
-			// 각 심볼별로 데이터 수집 및 신호 생성
 			for _, symbol := range topSymbols {
 				if _, exists := trackers[symbol]; !exists {
 					trackers[symbol] = NewCoinTracker(symbol)
@@ -113,48 +110,46 @@ func startService(ctx context.Context) {
 					continue
 				}
 
-				if len(candles) == candleLimit {
-					indicators, err := calculateIndicators(candles)
+				if len(candles) < 2 {
+					log.Printf("Insufficient data for %s: got %d candles\n", symbol, len(candles))
+					continue
+				}
+
+				lastCompletedCandle := candles[len(candles)-2]
+				indicators, err := calculateIndicators(candles)
+				if err != nil {
+					log.Printf("❌ Error calculating indicators for %s: %v\n", symbol, err)
+					continue
+				}
+
+				signalType, conditions, stopLoss, takeProfit := generateSignal(candles, indicators)
+
+				if signalType != trackers[symbol].LastSignal || lastCompletedCandle.CloseTime != trackers[symbol].LastSignalTime {
+					price, err := strconv.ParseFloat(lastCompletedCandle.Close, 64)
 					if err != nil {
-						log.Printf("❌ Error calculating indicators for %s: %v\n", symbol, err)
+						log.Printf("❌ Error converting price for %s: %v\n", symbol, err)
 						continue
 					}
 
-					signalType, conditions, stopLoss, takeProfit := generateSignal(candles, indicators)
-					lastCandle := candles[len(candles)-1]
-
-					// 새로운 신호이거나 다른 시간의 신호인 경우에만 처리
-					if signalType != trackers[symbol].LastSignal || lastCandle.CloseTime != trackers[symbol].LastSignalTime {
-						price, err := strconv.ParseFloat(lastCandle.Close, 64)
-						if err != nil {
-							log.Printf("❌ Error converting price for %s: %v\n", symbol, err)
-							continue
-						}
-
-						signalResult := lib.SignalResult{
-							Symbol:     symbol,
-							Signal:     signalType,
-							Timestamp:  lastCandle.CloseTime,
-							Price:      price,
-							Conditions: conditions,
-							StopLoss:   stopLoss,
-							TakeProfit: takeProfit,
-						}
-
-						if err := processSignal(signalResult); err != nil {
-							log.Printf("Error processing signal for %s: %v", symbol, err)
-						}
-
-						trackers[symbol].LastSignal = signalType
-						trackers[symbol].LastSignalTime = lastCandle.CloseTime
+					signalResult := lib.SignalResult{
+						Symbol:     symbol,
+						Signal:     signalType,
+						Timestamp:  lastCompletedCandle.CloseTime,
+						Price:      price,
+						Conditions: conditions,
+						StopLoss:   stopLoss,
+						TakeProfit: takeProfit,
 					}
-				} else {
-					log.Printf("Insufficient data for %s: got %d candles, expected %d\n",
-						symbol, len(candles), candleLimit)
+
+					if err := processSignal(signalResult); err != nil {
+						log.Printf("Error processing signal for %s: %v", symbol, err)
+					}
+
+					trackers[symbol].LastSignal = signalType
+					trackers[symbol].LastSignalTime = lastCompletedCandle.CloseTime
 				}
 			}
 
-			// 더 이상 상위 코인이 아닌 심볼들은 트래커에서 제거
 			for symbol := range trackers {
 				found := false
 				for _, topSymbol := range topSymbols {

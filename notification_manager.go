@@ -12,6 +12,7 @@ import (
 
 // processSignal과 generateDiscordEmbed 함수
 func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
+	/// TODO:  시간이 이상함
 	koreaLocation, _ := time.LoadLocation("Asia/Seoul")
 	timestamp := time.Unix(signalResult.Timestamp/1000, 0).In(koreaLocation)
 
@@ -25,7 +26,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 		signalEmoji = "⏺️ NO SIGNAL"
 	}
 
-	mainDescription := fmt.Sprintf("**시간**: %s\n**현재가**: $%.2f\n",
+	mainDescription := fmt.Sprintf("**시간**: %s\n**현재가**: $%.6f\n",
 		timestamp.Format("2006-01-02 15:04:05 KST"),
 		signalResult.Price)
 
@@ -40,7 +41,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 			takeProfitPercent = -takeProfitPercent
 		}
 
-		mainDescription += fmt.Sprintf("**스탑로스**: $%.2f (%.2f%%)\n**목표가**: $%.2f (%.2f%%)\n",
+		mainDescription += fmt.Sprintf("**스탑로스**: $%.5f (%.5f%%)\n**목표가**: $%.5f (%.5f%%)\n",
 			signalResult.StopLoss,
 			stopLossPercent,
 			signalResult.TakeProfit,
@@ -54,7 +55,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 		Fields: []notification.EmbedField{
 			{
 				Name: "📈 LONG",
-				Value: fmt.Sprintf("```diff\n%s\n%s\n%s```\n```\n[EMA200]: %.2f (차이: %.2f)\n[MACD Line]: %.2f\n[Signal Line]: %.2f\n[Histogram]: %.2f\n[SAR]: %.2f (차이: %.2f)```",
+				Value: fmt.Sprintf("```diff\n%s\n%s\n%s```\n```\n[EMA200]: %.5f (차이: %.5f)\n[MACD Line]: %.5f\n[Signal Line]: %.5f\n[Histogram]: %.5f\n[SAR]: %.5f (차이: %.5f)```",
 					formatConditionWithSymbol(signalResult.Conditions.Long.EMA200Condition, "EMA200"),
 					formatConditionWithSymbol(signalResult.Conditions.Long.MACDCondition, "MACD"),
 					formatConditionWithSymbol(signalResult.Conditions.Long.ParabolicSARCondition, "SAR"),
@@ -69,7 +70,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 			},
 			{
 				Name: "📉 SHORT",
-				Value: fmt.Sprintf("```diff\n%s\n%s\n%s```\n```[EMA200]: %.2f (차이: %.2f)\n[MACD Line]: %.2f\n[Signal Line]: %.2f\n[Histogram]: %.2f\n[SAR]: %.2f (차이: %.2f)```",
+				Value: fmt.Sprintf("```diff\n%s\n%s\n%s```\n```[EMA200]: %.5f (차이: %.5f)\n[MACD Line]: %.5f\n[Signal Line]: %.5f\n[Histogram]: %.5f\n[SAR]: %.5f (차이: %.5f)```",
 					formatConditionWithSymbol(signalResult.Conditions.Short.EMA200Condition, "EMA200"),
 					formatConditionWithSymbol(signalResult.Conditions.Short.MACDCondition, "MACD"),
 					formatConditionWithSymbol(signalResult.Conditions.Short.ParabolicSARCondition, "SAR"),

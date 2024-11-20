@@ -11,15 +11,39 @@ import (
 
 // 매수 신호 생성 함수
 func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators) (string, lib.SignalConditions, float64, float64) {
+	if len(candles) < 2 { // 최소 2개의 캔들 필요
+		// 캔들조회 에러
+		return signalType.No_Signal.String(), lib.SignalConditions{}, 0.0, 0.0
+	}
+
 	lastPrice, _ := strconv.ParseFloat(candles[len(candles)-1].Close, 64)
 	lastHigh, _ := strconv.ParseFloat(candles[len(candles)-1].High, 64)
 	lastLow, _ := strconv.ParseFloat(candles[len(candles)-1].Low, 64)
+
+	prevPrices := make([]float64, len(candles)-1)
+	for i := 0; i < len(candles)-1; i++ {
+		price, _ := strconv.ParseFloat(candles[i].Close, 64)
+		prevPrices[i] = price
+	}
+
+	prevMACDLine, prevSignalLine := calculate.CalculateMACD(prevPrices)
+
+	macdCross := lib.MACDCross{
+		CurrentMACDLine:   indicators.MACDLine,
+		CurrentSignalLine: indicators.SignalLine,
+		PrevMACDLine:      prevMACDLine,
+		PrevSignalLine:    prevSignalLine,
+	}
+
+	upCross := macdCross.PrevMACDLine < macdCross.PrevSignalLine && macdCross.CurrentMACDLine > macdCross.CurrentSignalLine
+
+	downCross := macdCross.PrevMACDLine > macdCross.PrevSignalLine && macdCross.CurrentMACDLine < macdCross.CurrentSignalLine
 
 	conditions := lib.SignalConditions{
 		Long: lib.SignalDetail{
 			EMA200Condition:       lastPrice > indicators.EMA200,
 			ParabolicSARCondition: indicators.ParabolicSAR < lastLow,
-			MACDCondition:         indicators.MACDLine > indicators.SignalLine,
+			MACDCondition:         upCross, // 크로스 조건으로 변경
 			EMA200Value:           indicators.EMA200,
 			EMA200Diff:            lastPrice - indicators.EMA200,
 			ParabolicSARValue:     indicators.ParabolicSAR,
@@ -31,7 +55,7 @@ func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators
 		Short: lib.SignalDetail{
 			EMA200Condition:       lastPrice < indicators.EMA200,
 			ParabolicSARCondition: indicators.ParabolicSAR > lastHigh,
-			MACDCondition:         indicators.MACDLine < indicators.SignalLine,
+			MACDCondition:         downCross, // 크로스 조건으로 변경
 			EMA200Value:           indicators.EMA200,
 			EMA200Diff:            lastPrice - indicators.EMA200,
 			ParabolicSARValue:     indicators.ParabolicSAR,
@@ -42,17 +66,28 @@ func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators
 		},
 	}
 
+	// 최대 손절 거리
+	const maxStopLossDistance = 0.007 // 0.7%
 	var stopLoss, takeProfit float64
 
 	if conditions.Long.EMA200Condition && conditions.Long.ParabolicSARCondition && conditions.Long.MACDCondition {
 		stopLoss = indicators.ParabolicSAR
+		// Long 포지션의 경우
+		if lastPrice-stopLoss > lastPrice*maxStopLossDistance {
+			stopLoss = lastPrice * (1 - maxStopLossDistance)
+		}
 		takeProfit = lastPrice + (lastPrice - stopLoss)
 		return signalType.Long.String(), conditions, stopLoss, takeProfit
 	} else if conditions.Short.EMA200Condition && conditions.Short.ParabolicSARCondition && conditions.Short.MACDCondition {
 		stopLoss = indicators.ParabolicSAR
+		// Short 포지션의 경우
+		if stopLoss-lastPrice > lastPrice*maxStopLossDistance {
+			stopLoss = lastPrice * (1 + maxStopLossDistance)
+		}
 		takeProfit = lastPrice - (stopLoss - lastPrice)
 		return signalType.Short.String(), conditions, stopLoss, takeProfit
 	}
+
 	return signalType.No_Signal.String(), conditions, 0.0, 0.0
 }
 
