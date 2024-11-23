@@ -6,7 +6,6 @@ import (
 
 	"github.com/assist-by/abmodule/notification"
 	lib "github.com/assist-by/libStruct"
-	signalType "github.com/assist-by/libStruct/enums/signalType"
 )
 
 // processSignal과 generateDiscordEmbed 함수
@@ -17,9 +16,9 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 
 	var signalEmoji string
 	switch signalResult.Signal {
-	case signalType.Long.String():
+	case lib.SIGNAL_LONG:
 		signalEmoji = "🚀 LONG"
-	case signalType.Short.String():
+	case lib.SIGNAL_SHORT:
 		signalEmoji = "🔻 SHORT"
 	default:
 		signalEmoji = "⏺️ NO SIGNAL"
@@ -29,13 +28,13 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 		timestamp.Format("2006-01-02 15:04:05 KST"),
 		signalResult.Price)
 
-	if signalResult.Signal != signalType.No_Signal.String() {
+	if signalResult.Signal != lib.SIGNAL_LONG {
 		// 수익률 계산
 		stopLossPercent := (signalResult.StopLoss - signalResult.Price) / signalResult.Price * 100
 		takeProfitPercent := (signalResult.TakeProfit - signalResult.Price) / signalResult.Price * 100
 
 		// Short 포지션일 경우 수익률 부호를 반대로
-		if signalResult.Signal == signalType.Short.String() {
+		if signalResult.Signal == lib.SIGNAL_SHORT {
 			stopLossPercent = -stopLossPercent
 			takeProfitPercent = -takeProfitPercent
 		}

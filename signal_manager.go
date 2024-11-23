@@ -6,15 +6,13 @@ import (
 
 	"github.com/assist-by/abmodule/calculate"
 	lib "github.com/assist-by/libStruct"
-
-	signalType "github.com/assist-by/libStruct/enums/signalType"
 )
 
 // 매수 신호 생성 함수
-func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators) (string, lib.SignalConditions, float64, float64) {
+func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators) (lib.SignalType, lib.SignalConditions, float64, float64) {
 	if len(candles) < 2 { // 최소 2개의 캔들 필요
 		// 캔들조회 에러
-		return signalType.No_Signal.String(), lib.SignalConditions{}, 0.0, 0.0
+		return lib.SIGNAL_NO_SIGANL, lib.SignalConditions{}, 0.0, 0.0
 	}
 
 	lastPrice, _ := strconv.ParseFloat(candles[len(candles)-1].Close, 64)
@@ -78,7 +76,7 @@ func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators
 			stopLoss = lastPrice * (1 - maxStopLossDistance)
 		}
 		takeProfit = lastPrice + (lastPrice - stopLoss)
-		return signalType.Long.String(), conditions, stopLoss, takeProfit
+		return lib.SIGNAL_LONG, conditions, stopLoss, takeProfit
 	} else if conditions.Short.EMA200Condition && conditions.Short.ParabolicSARCondition && conditions.Short.MACDCondition {
 		stopLoss = indicators.ParabolicSAR
 		// Short 포지션의 경우
@@ -86,10 +84,10 @@ func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators
 			stopLoss = lastPrice * (1 + maxStopLossDistance)
 		}
 		takeProfit = lastPrice - (stopLoss - lastPrice)
-		return signalType.Short.String(), conditions, stopLoss, takeProfit
+		return lib.SIGNAL_SHORT, conditions, stopLoss, takeProfit
 	}
 
-	return signalType.No_Signal.String(), conditions, 0.0, 0.0
+	return lib.SIGNAL_NO_SIGANL, conditions, 0.0, 0.0
 }
 
 // 보조지표값 계산 함수

@@ -1,6 +1,6 @@
-github.com/assist-by/abmodule v0.1.2 h1:euIpWuvWDPyGDYMXXl6njmrk5FYoUEnQ6qW62UVYEz0=
-github.com/assist-by/abmodule v0.1.2/go.mod h1:t1+tLJl270Yic9Oo/6gzdTTlHMUFT/ZOpkvyZN/EJrM=
-github.com/assist-by/libStruct v0.9.2 h1:4mjmp6/TgSiOviyKzmRZ+1LE2hB/sZ64+W+ewdzd2uc=
-github.com/assist-by/libStruct v0.9.2/go.mod h1:m2xSaOACiKibwSn3Hd9sPdJTm0V2Rpoa7/r5y91CbhM=
+github.com/assist-by/abmodule v0.9.1 h1:MMLrYeck9HS/IU8ovpePjyooZ4E0L6T9Teuq5w+m264=
+github.com/assist-by/abmodule v0.9.1/go.mod h1:8UY5i0dWIqNGyzpJOO/yVKNG9IZViMhBtscagVe5m2o=
+github.com/assist-by/libStruct v0.9.8 h1:KBEpEHbQEqdGojkpuYZKO+s6QUhk/UXMlHZAbdiQTbo=
+github.com/assist-by/libStruct v0.9.8/go.mod h1:m2xSaOACiKibwSn3Hd9sPdJTm0V2Rpoa7/r5y91CbhM=
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
