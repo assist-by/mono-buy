@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/assist-by/abmodule/notification"
@@ -95,17 +94,4 @@ func formatConditionWithSymbol(condition bool, text string) string {
 		return fmt.Sprintf("✅ %s", text)
 	}
 	return fmt.Sprintf("❌ %s", text)
-}
-
-func processSignal(signalResult lib.SignalResult) error {
-	log.Printf("Processing signal: %+v", signalResult)
-
-	discordEmbed := generateDiscordEmbed(signalResult)
-	if err := notification.SendDiscordAlert(discordEmbed, discordWebhookURL); err != nil {
-		log.Printf("Error sending Discord alert: %v", err)
-		return err
-	}
-
-	log.Println("Notifications sent successfully")
-	return nil
 }
