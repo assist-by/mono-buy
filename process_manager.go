@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/assist-by/abmodule/notification"
-	"github.com/assist-by/mono-buy/lib"
+	lib "github.com/assist-by/libStruct"
 )
 
 func processSignal(signalResult lib.SignalResult) error {

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/assist-by/mono-buy/lib"
+	lib "github.com/assist-by/libStruct"
 	"github.com/joho/godotenv"
 )
 

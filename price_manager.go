@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/assist-by/mono-buy/lib"
+	lib "github.com/assist-by/libStruct"
 )
 
 var intervalMap = map[time.Duration]string{

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/assist-by/abmodule/notification"
-	"github.com/assist-by/mono-buy/lib"
-	signalType "github.com/assist-by/mono-buy/lib/enums/signalType"
+	lib "github.com/assist-by/libStruct"
+	signalType "github.com/assist-by/libStruct/enums/signalType"
 )
 
 // processSignal과 generateDiscordEmbed 함수
