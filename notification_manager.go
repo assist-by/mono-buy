@@ -10,7 +10,6 @@ import (
 
 // processSignal과 generateDiscordEmbed 함수
 func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
-	/// TODO:  시간이 이상함
 	koreaLocation, _ := time.LoadLocation("Asia/Seoul")
 	timestamp := time.Unix(signalResult.Timestamp/1000, 0).In(koreaLocation)
 
@@ -28,7 +27,7 @@ func generateDiscordEmbed(signalResult lib.SignalResult) notification.Embed {
 		timestamp.Format("2006-01-02 15:04:05 KST"),
 		signalResult.Price)
 
-	if signalResult.Signal != lib.SIGNAL_LONG {
+	if signalResult.Signal == lib.SIGNAL_LONG || signalResult.Signal == lib.SIGNAL_SHORT {
 		// 수익률 계산
 		stopLossPercent := (signalResult.StopLoss - signalResult.Price) / signalResult.Price * 100
 		takeProfitPercent := (signalResult.TakeProfit - signalResult.Price) / signalResult.Price * 100

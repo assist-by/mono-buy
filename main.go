@@ -15,10 +15,11 @@ import (
 )
 
 const (
+	/// TODO: 선물거래 가격을 조회하자
 	binanceKlineAPI = "https://api.binance.com/api/v3/klines"
 	maxRetries      = 5
 	retryDelay      = 5 * time.Second
-	candleLimit     = 300
+	candleLimit     = 1000
 	// fetchInterval   = 1 * time.Minute
 )
 
