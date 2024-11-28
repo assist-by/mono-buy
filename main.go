@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	lib "github.com/assist-by/libStruct"
+	"github.com/assist-by/mono-buy/futures"
 	"github.com/joho/godotenv"
 )
 
@@ -56,9 +56,11 @@ func NewCoinTracker(symbol string) *lib.CoinTracker {
 	}
 }
 func startService(ctx context.Context) {
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
+	client := futures.NewClient(apikey, secretkey)
 	trackers := make(map[string]*lib.CoinTracker)
 
 	for {
@@ -70,7 +72,7 @@ func startService(ctx context.Context) {
 
 		select {
 		case <-time.After(sleepDuration):
-			topSymbols, err := getTopVolumeSymbols(3)
+			topSymbols, err := client.GetTopVolumeSymbols(3)
 			if err != nil {
 				log.Printf("❌ Error fetching top volume symbols: %v\n", err)
 				continue
@@ -78,7 +80,7 @@ func startService(ctx context.Context) {
 
 			log.Printf("🔍 현재 추적 중인 상위 코인: %v\n", topSymbols)
 
-			balances, err := fetchWalletBalance(apikey, secretkey)
+			balances, err := client.GetWalletBalance()
 			if err != nil {
 				log.Printf("❌ Error fetching wallet balances: %v\n", err)
 			} else {
@@ -99,13 +101,12 @@ func startService(ctx context.Context) {
 					trackers[symbol] = NewCoinTracker(symbol)
 				}
 
-				url := fmt.Sprintf("%s?symbol=%s&interval=%s&limit=%d",
-					binanceKlineAPI,
+				candles, err := client.GetKlineData(
 					symbol,
 					getIntervalString(fetchInterval),
-					candleLimit)
+					candleLimit,
+				)
 
-				candles, err := fetchCandleData(url)
 				if err != nil {
 					log.Printf("❌ Error fetching candle data for %s: %v\n", symbol, err)
 					continue

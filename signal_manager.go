@@ -6,10 +6,11 @@ import (
 
 	"github.com/assist-by/abmodule/calculate"
 	lib "github.com/assist-by/libStruct"
+	future "github.com/assist-by/mono-buy/futures"
 )
 
 // 매수 신호 생성 함수
-func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators) (lib.SignalType, lib.SignalConditions, float64, float64) {
+func generateSignal(candles []future.CandleData, indicators lib.TechnicalIndicators) (lib.SignalType, lib.SignalConditions, float64, float64) {
 	if len(candles) < 2 { // 최소 2개의 캔들 필요
 		// 캔들조회 에러
 		return lib.SIGNAL_NO_SIGANL, lib.SignalConditions{}, 0.0, 0.0
@@ -91,7 +92,7 @@ func generateSignal(candles []lib.CandleData, indicators lib.TechnicalIndicators
 }
 
 // 보조지표값 계산 함수
-func calculateIndicators(candles []lib.CandleData) (lib.TechnicalIndicators, error) {
+func calculateIndicators(candles []future.CandleData) (lib.TechnicalIndicators, error) {
 	if len(candles) < 300 {
 		return lib.TechnicalIndicators{}, fmt.Errorf("insufficient data: need at least 300 candles, got %d", len(candles))
 	}
