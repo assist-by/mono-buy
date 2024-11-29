@@ -117,7 +117,19 @@ func startService(ctx context.Context) {
 					continue
 				}
 
-				lastCompletedCandle := candles[len(candles)-2]
+				// 마지막 캔들의 종료 시간 확인
+				lastCandle := candles[len(candles)-1]
+				lastCandleCloseTime := time.Unix(lastCandle.CloseTime/1000, 0)
+
+				var completedCandle futures.CandleData
+				if now.Equal(lastCandleCloseTime) || now.After(lastCandleCloseTime) {
+					// 마지막 캔들이 이미 완료됐다면
+					completedCandle = lastCandle
+				} else {
+					// 마지막 캔들이 아직 진행중이라면
+					completedCandle = candles[len(candles)-2]
+				}
+
 				indicators, err := calculateIndicators(candles)
 				if err != nil {
 					log.Printf("❌ Error calculating indicators for %s: %v\n", symbol, err)
@@ -126,8 +138,8 @@ func startService(ctx context.Context) {
 
 				signalType, conditions, stopLoss, takeProfit := generateSignal(candles, indicators)
 
-				if signalType != trackers[symbol].LastSignal || lastCompletedCandle.CloseTime != trackers[symbol].LastSignalTime {
-					price, err := strconv.ParseFloat(lastCompletedCandle.Close, 64)
+				if signalType != trackers[symbol].LastSignal || completedCandle.CloseTime != trackers[symbol].LastSignalTime {
+					price, err := strconv.ParseFloat(completedCandle.Close, 64)
 					if err != nil {
 						log.Printf("❌ Error converting price for %s: %v\n", symbol, err)
 						continue
@@ -136,7 +148,7 @@ func startService(ctx context.Context) {
 					signalResult := lib.SignalResult{
 						Symbol:     symbol,
 						Signal:     signalType,
-						Timestamp:  lastCompletedCandle.CloseTime,
+						Timestamp:  completedCandle.CloseTime,
 						Price:      price,
 						Conditions: conditions,
 						StopLoss:   stopLoss,
@@ -148,7 +160,7 @@ func startService(ctx context.Context) {
 					}
 
 					trackers[symbol].LastSignal = signalType
-					trackers[symbol].LastSignalTime = lastCompletedCandle.CloseTime
+					trackers[symbol].LastSignalTime = completedCandle.CloseTime
 				}
 			}
 
