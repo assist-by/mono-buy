@@ -2,6 +2,7 @@ package futures
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -121,4 +122,85 @@ func getOppositeOrderSide(side OrderSide) OrderSide {
 	}
 
 	return BUY
+}
+
+func (f *FutureClient) SetLeverage(symbol string, leverage int) error {
+	timestamp := time.Now().UnixMilli()
+	params := url.Values{}
+	params.Add("symbol", symbol)
+	params.Add("leverage", strconv.Itoa(leverage))
+	params.Add("timestamp", strconv.FormatInt(timestamp, 10))
+
+	signature := f.sign(params.Encode())
+	params.Add("signature", signature)
+
+	endpoint := "/fapi/v1/leverage"
+
+	req, err := http.NewRequest("POST", f.BaseURL+endpoint+"?"+params.Encode(), nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("X-MBX-APIKEY", f.APIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("setting leverage failed: %s", string(body))
+	}
+
+	return nil
+}
+
+// 포지션 모드 설정 (Hedge Mode / One-way Mode)
+func (f *FutureClient) SetPositionMode(hedgeMode bool) error {
+	timestamp := time.Now().UnixMilli()
+	params := url.Values{}
+	params.Add("dualSidePosition", strconv.FormatBool(hedgeMode))
+	params.Add("timestamp", strconv.FormatInt(timestamp, 10))
+
+	signature := f.sign(params.Encode())
+	params.Add("signature", signature)
+
+	endpoint := "/fapi/v1/positionSide/dual"
+	req, err := http.NewRequest("POST", f.BaseURL+endpoint+"?"+params.Encode(), nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("X-MBX-APIKEY", f.APIKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("setting position mode failed: %s", string(body))
+	}
+
+	return nil
+}
+
+// 수량을 stepSize에 맞게 내림하는 유틸리티 함수
+func FloorToStepSize(quantity float64, stepSize float64) float64 {
+	precision := getPrecisionFromStepSize(stepSize)
+	factor := float64(10 * precision)
+	return float64(int(quantity*factor)) / factor
+}
+
+func getPrecisionFromStepSize(stepSize float64) int {
+	precision := 0
+	for stepSize < 1 {
+		stepSize *= 10
+		precision++
+	}
+	return precision
 }
