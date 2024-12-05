@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/assist-by/abmodule/notification"
 	lib "github.com/assist-by/libStruct"
+	"github.com/assist-by/mono-buy/discord"
 	"github.com/assist-by/mono-buy/futures"
 )
 
@@ -18,12 +18,14 @@ func processSignal(signalResult lib.SignalResult) error {
 
 // send notification
 func sendNotification(signalResult lib.SignalResult) error {
+	discordClient := discord.NewClient(discordWebhookURL)
 	log.Printf("Processing signal: %+v", signalResult)
 
 	// discord embedding
 	discordEmbed := generateDiscordEmbed(signalResult)
+
 	// discord로 알림 보내기
-	if err := notification.SendDiscordAlert(discordEmbed, discordWebhookURL); err != nil {
+	if err := discordClient.Send(discordEmbed); err != nil {
 		log.Printf("Error sending Discord alert: %v", err)
 		return err
 	}
