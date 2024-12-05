@@ -24,14 +24,15 @@ const (
 )
 
 var (
-	apikey            string
-	secretkey         string
-	isRunning         bool
-	discordWebhookURL string
-	fetchInterval     time.Duration
-	runningMutex      sync.Mutex
-	serviceCtx        context.Context
-	serviceCtxCancel  context.CancelFunc
+	apikey                 string
+	secretkey              string
+	isRunning              bool
+	discordWebhookURL      string
+	discordWebhookTradeURL string
+	fetchInterval          time.Duration
+	runningMutex           sync.Mutex
+	serviceCtx             context.Context
+	serviceCtxCancel       context.CancelFunc
 )
 
 func init() {
@@ -41,6 +42,7 @@ func init() {
 	}
 
 	discordWebhookURL = os.Getenv("DISCORD_WEBHOOK_URL")
+	discordWebhookTradeURL = os.Getenv("DISCORD_WEBHOOK_TRADE_URL")
 	apikey = os.Getenv("API_KEY")
 	secretkey = os.Getenv("SECRET_KEY")
 	fetchInterval, err = time.ParseDuration(os.Getenv("FETCH_INTERVAL"))

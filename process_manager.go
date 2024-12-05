@@ -45,6 +45,7 @@ func sendOrder(signalResult lib.SignalResult) error {
 
 	// send buy api
 	client := futures.NewClient(apikey, secretkey)
+	discordClient := discord.NewClient(discordWebhookTradeURL)
 
 	// 1. Hedge 모드 설정
 	if err := client.SetPositionMode(true); err != nil {
@@ -79,7 +80,9 @@ func sendOrder(signalResult lib.SignalResult) error {
 
 	// 최소 주문 금액 체크
 	if positionSize*signalResult.Price < symbolInfo.MinNotional {
-		return fmt.Errorf("order size too small. minimum notional: %v", symbolInfo.MinNotional)
+		err := fmt.Errorf("order size too small. minimum notional: %v", symbolInfo.MinNotional)
+		discordClient.SendTradeNotification(signalResult, positionSize, err)
+		return err
 	}
 
 	var order futures.OrderRequest
@@ -118,7 +121,9 @@ func sendOrder(signalResult lib.SignalResult) error {
 
 	/// 주문하기
 	if err := client.PlaceOrder(order); err != nil {
+		discordClient.SendTradeNotification(signalResult, positionSize, err)
 		return fmt.Errorf("placing order: %w", err)
 	}
+	discordClient.SendTradeNotification(signalResult, positionSize, nil)
 	return nil
 }
