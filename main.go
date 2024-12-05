@@ -57,6 +57,7 @@ func NewCoinTracker(symbol string) *lib.CoinTracker {
 		Symbol: symbol,
 	}
 }
+
 func startService(ctx context.Context) {
 
 	signals := make(chan os.Signal, 1)

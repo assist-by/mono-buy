@@ -3,31 +3,30 @@ package main
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/assist-by/abmodule/calculate"
 	lib "github.com/assist-by/libStruct"
 	future "github.com/assist-by/mono-buy/futures"
 )
 
-func processCandles(candles []future.CandleData, now time.Time) (lastCompleteCandle future.CandleData, err error) {
-	if len(candles) < 2 {
-		return future.CandleData{}, fmt.Errorf("insufficient candles data")
-	}
+// func processCandles(candles []future.CandleData, now time.Time) (lastCompleteCandle future.CandleData, err error) {
+// 	if len(candles) < 2 {
+// 		return future.CandleData{}, fmt.Errorf("insufficient candles data")
+// 	}
 
-	// 마지막 캔들의 종료 시간을 확인
-	lastCandle := candles[len(candles)-1]
-	lastCandleClose := time.Unix(lastCandle.CloseTime/1000, 0)
+// 	// 마지막 캔들의 종료 시간을 확인
+// 	lastCandle := candles[len(candles)-1]
+// 	lastCandleClose := time.Unix(lastCandle.CloseTime/1000, 0)
 
-	// 현재 시간이 마지막 캔들의 종료 시간보다 크거나 같으면
-	// 마지막 캔들이 완료된 캔들임
-	if now.Equal(lastCandleClose) || now.After(lastCandleClose) {
-		return lastCandle, nil
-	}
+// 	// 현재 시간이 마지막 캔들의 종료 시간보다 크거나 같으면
+// 	// 마지막 캔들이 완료된 캔들임
+// 	if now.Equal(lastCandleClose) || now.After(lastCandleClose) {
+// 		return lastCandle, nil
+// 	}
 
-	// 그렇지 않으면 마지막에서 두 번째 캔들이 완료된 마지막 캔들
-	return candles[len(candles)-2], nil
-}
+// 	// 그렇지 않으면 마지막에서 두 번째 캔들이 완료된 마지막 캔들
+// 	return candles[len(candles)-2], nil
+// }
 
 // 매수 신호 생성 함수
 func generateSignal(candles []future.CandleData, indicators lib.TechnicalIndicators) (lib.SignalType, lib.SignalConditions, float64, float64) {

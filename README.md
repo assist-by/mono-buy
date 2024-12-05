@@ -23,6 +23,12 @@ GOOS=linux GOARCH=amd64 go build -o mono-buy
 $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o mono-buy
 ```
 
+## 다시 윈도우로 되돌리기
+
+```bash
+$env:GOOS="windows";
+```
+
 ## Linux에서 백그라운드 실행하는 법
 
 ```bash

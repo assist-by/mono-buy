@@ -12,7 +12,7 @@ import (
 func processSignal(signalResult lib.SignalResult) error {
 	// send notification
 	sendNotification(signalResult)
-	// sendOrder(signalResult)
+	sendOrder(signalResult)
 	return nil
 }
 
