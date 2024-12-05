@@ -1,3 +1,12 @@
+### 0.9.4
+
+- feature development
+> 신호에 따른 매매 코드 추가(실제 매매 X)
+> 매매 작동 시 결과를 알림으로 보내도록 구현
+
+- code refactoring
+> discord 객체 구현해서 코드 리팩토링 진행
+
 ### 0.9.3
 
 - bug fix
