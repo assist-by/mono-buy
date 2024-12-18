@@ -1,3 +1,9 @@
+### 0.9.6
+
+- bug fix
+> sendOrder할 때 서버와 timestamp가 맞지 않는 현상 개선
+> sendOrder() 함수 에러 처리 개선
+
 ### 0.9.5
 
 - code refactoring
