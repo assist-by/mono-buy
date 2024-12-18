@@ -21,19 +21,26 @@ type CandleData struct {
 	TakerBuyQuoteAssetVolume string `json:"takerBuyQuoteAssetVolume"`
 }
 
+type AccountBalance struct {
+	Asset              string  `json:"asset"`
+	CrossWalletBalance float64 `json:"crossWalletBalance,string"`
+	CrossUnPnl         float64 `json:"crossUnPnl,string"`
+	AvailableBalance   float64 `json:"availableBalance,string"`
+	WalletBalance      float64 `json:"walletBalance,string"`
+}
+
 type Balance struct {
-	Asset  string  `json:"asset"`
-	Free   float64 `json:"free"`
-	Locked float64 `json:"locked"`
-	Total  float64 `json:"total"`
+	Free   float64
+	Locked float64
 }
 
 type FutureClient struct {
-	APIKey     string
-	SecretKey  string
-	BaseURL    string
-	MaxRetries int
-	RetryDelay time.Duration
+	APIKey           string
+	SecretKey        string
+	BaseURL          string
+	ServerTimeOffset int64
+	MaxRetries       int
+	RetryDelay       time.Duration
 }
 
 func NewClient(apiKey, secretKey string) *FutureClient {

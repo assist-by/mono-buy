@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 
 // SendTradeNotification sends a detailed trade notification to Discord
 func (c *Client) SendTradeNotification(signalResult lib.SignalResult, orderSize float64, err error) error {
+
+	log.Printf("send order notification start")
 	var embed Embed
 
 	// 주문 성공 시

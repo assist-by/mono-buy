@@ -1,12 +1,12 @@
 package futures
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 )
 
 type OrderSide string
@@ -137,11 +137,17 @@ func getOppositeOrderSide(side OrderSide) OrderSide {
 }
 
 func (f *FutureClient) SetLeverage(symbol string, leverage int) error {
-	timestamp := time.Now().UnixMilli()
+	// 서버 시간 가져오기
+	serverTime, err := f.GetServerTime()
+	if err != nil {
+		return fmt.Errorf("getting server time: %w", err)
+	}
+
 	params := url.Values{}
 	params.Add("symbol", symbol)
 	params.Add("leverage", strconv.Itoa(leverage))
-	params.Add("timestamp", strconv.FormatInt(timestamp, 10))
+	params.Add("timestamp", strconv.FormatInt(serverTime, 10))
+	params.Add("recvWindow", "10000")
 
 	signature := f.sign(params.Encode())
 	params.Add("signature", signature)
@@ -170,11 +176,17 @@ func (f *FutureClient) SetLeverage(symbol string, leverage int) error {
 }
 
 // 포지션 모드 설정 (Hedge Mode / One-way Mode)
+
 func (f *FutureClient) SetPositionMode(hedgeMode bool) error {
-	timestamp := time.Now().UnixMilli()
+	serverTime, err := f.GetServerTime()
+	if err != nil {
+		return fmt.Errorf("getting server time: %w", err)
+	}
+
 	params := url.Values{}
 	params.Add("dualSidePosition", strconv.FormatBool(hedgeMode))
-	params.Add("timestamp", strconv.FormatInt(timestamp, 10))
+	params.Add("timestamp", strconv.FormatInt(serverTime, 10))
+	params.Add("recvWindow", "10000")
 
 	signature := f.sign(params.Encode())
 	params.Add("signature", signature)
@@ -195,18 +207,30 @@ func (f *FutureClient) SetPositionMode(hedgeMode bool) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+
+		// Binance 에러 응답 파싱
+		var binanceErr BinanceError
+		if err := json.Unmarshal(body, &binanceErr); err != nil {
+			return fmt.Errorf("parsing error response: %w", err)
+		}
+
+		// 이미 설정되어 있는 경우
+		if binanceErr.Code == ERROR_NO_NEED_TO_CHANGE_POSITION {
+			return nil
+		}
+
 		return fmt.Errorf("setting position mode failed: %s", string(body))
 	}
 
 	return nil
 }
 
-// 수량을 stepSize에 맞게 내림하는 유틸리티 함수
-func FloorToStepSize(quantity float64, stepSize float64) float64 {
-	precision := getPrecisionFromStepSize(stepSize)
-	factor := float64(10 * precision)
-	return float64(int(quantity*factor)) / factor
-}
+// // 수량을 stepSize에 맞게 내림하는 유틸리티 함수
+// func FloorToStepSize(quantity float64, stepSize float64) float64 {
+// 	precision := getPrecisionFromStepSize(stepSize)
+// 	factor := float64(10 * precision)
+// 	return float64(int(quantity*factor)) / factor
+// }
 
 func getPrecisionFromStepSize(stepSize float64) int {
 	precision := 0

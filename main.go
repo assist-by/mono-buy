@@ -92,8 +92,8 @@ func startService(ctx context.Context) {
 					log.Printf("⚠️ 잔액이 있는 자산이 없습니다.")
 				} else {
 					for asset, balance := range balances {
-						log.Printf("🏦 %s 보유량: %.8f (가용: %.8f, 잠금: %.8f)\n",
-							asset, balance.Total, balance.Free, balance.Locked)
+						log.Printf("🏦 %s (가용: %.8f, 잠금: %.8f)\n",
+							asset, balance.Free, balance.Locked)
 					}
 				}
 			}
@@ -157,9 +157,10 @@ func startService(ctx context.Context) {
 						StopLoss:   stopLoss,
 						TakeProfit: takeProfit,
 					}
-
+					// 시그널 처리 중 에러가 발생해도 다음 심볼 처리를 위해 continue
 					if err := processSignal(signalResult); err != nil {
 						log.Printf("Error processing signal for %s: %v", symbol, err)
+
 					}
 
 					trackers[symbol].LastSignal = signalType

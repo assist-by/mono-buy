@@ -4,14 +4,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
+func FloorToStepSize(quantity, stepSize float64) float64 {
+	precision := GetPrecisionFromStepSize(stepSize)
+	factor := math.Pow10(precision)
+	return math.Floor(quantity*factor) / factor
+}
+
+func GetPrecisionFromStepSize(stepSize float64) int {
+	stepStr := fmt.Sprint(stepSize)
+	if strings.Contains(stepStr, "e") {
+		// Handle scientific notation
+		parts := strings.Split(stepStr, "e-")
+		if len(parts) == 2 {
+			precision, err := strconv.Atoi(parts[1])
+			if err == nil {
+				return precision
+			}
+		}
+	}
+
+	parts := strings.Split(stepStr, ".")
+	if len(parts) < 2 {
+		return 0
+	}
+	return len(parts[1])
+}
 func (f *FutureClient) GetTopVolumeSymbols(n int) ([]string, error) {
 	endpoint := "/fapi/v1/ticker/24hr"
 
@@ -123,15 +148,20 @@ func (f *FutureClient) GetKlineData(symbol string, interval string, limit int) (
 }
 
 func (f *FutureClient) GetWalletBalance() (map[string]Balance, error) {
-	timestamp := time.Now().UnixMilli()
+	// 서버 시간 가져오기
+	serverTime, err := f.GetServerTime()
+	if err != nil {
+		return nil, fmt.Errorf("getting server time: %w", err)
+	}
+
 	params := url.Values{}
-	params.Add("timestamp", strconv.FormatInt(timestamp, 10))
+	params.Add("timestamp", strconv.FormatInt(serverTime, 10))
+	params.Add("recvWindow", "10000")
 
 	signature := f.sign(params.Encode())
 	params.Add("signature", signature)
 
-	endpoint := "/fapi/v2/balance"
-	req, err := http.NewRequest("GET", f.BaseURL+endpoint+"?"+params.Encode(), nil)
+	req, err := http.NewRequest("GET", f.BaseURL+"/fapi/v2/account?"+params.Encode(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -144,26 +174,26 @@ func (f *FutureClient) GetWalletBalance() (map[string]Balance, error) {
 	}
 	defer resp.Body.Close()
 
-	var balances []struct {
-		Asset  string  `json:"asset"`
-		Free   float64 `json:"free,string"`
-		Locked float64 `json:"locked,string"`
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("getting balance failed: %s", string(body))
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&balances); err != nil {
+	var accountInfo struct {
+		Assets []AccountBalance `json:"assets"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&accountInfo); err != nil {
 		return nil, fmt.Errorf("parsing response: %w", err)
 	}
 
-	result := make(map[string]Balance)
-	for _, b := range balances {
-		result[b.Asset] = Balance{
-			Asset:  b.Asset,
-			Free:   b.Free,
-			Locked: b.Locked,
-			Total:  b.Free + b.Locked,
+	balances := make(map[string]Balance)
+	for _, asset := range accountInfo.Assets {
+		balances[asset.Asset] = Balance{
+			Free:   asset.AvailableBalance,
+			Locked: asset.WalletBalance - asset.AvailableBalance,
 		}
 	}
 
-	return result, nil
-
+	return balances, nil
 }
